@@ -1,39 +1,58 @@
 import { Injectable } from '@nestjs/common';
 import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execPromise = promisify(exec);
+import * as fs from 'fs';  // برای کار با فایل
 
 @Injectable()
 export class MainService {
-  // فعال کردن کاربر
   async activateUser(publicKey: string): Promise<string> {
-    try {
-      // دستور اضافه کردن کاربر به فایل wg0.conf
-      const command = `wg set wg0 peer ${publicKey} allowed-ips ${publicKey}`;
-      await execPromise(command);
-      return 'User activated successfully';
-    } catch (error) {
-      throw new Error(`Error activating user: ${error.message}`);
-    }
+    const wg0ConfigPath = `/etc/openvpn/ccd/${publicKey}`;  // مسیر فایل کانفیگ WireGuard
+    return new Promise((resolve, reject) => {
+      fs.promises.readFile(wg0ConfigPath, 'utf-8')
+        .then(config => {
+          const updatedConfig = config.replace(
+            new RegExp(`# ### Client ${publicKey}[\\s\\S]*?# AllowedIPs = [\\d\\.]+/32`, 'g'),
+            match => match.split('\n').map(line => line.replace(/^# /, '')).join('\n')
+          );
+
+          return fs.promises.writeFile(wg0ConfigPath, updatedConfig, 'utf-8');
+        })
+        .then(() => {
+          exec('sudo systemctl restart wg-quick@wg0', (error, stdout, stderr) => {
+            if (error) {
+              reject(`Error restarting WireGuard: ${error.message}`);
+            } else {
+              resolve('User activated successfully');
+            }
+          });
+        })
+        .catch(err => reject(`Error handling config file: ${err.message}`));
+    });
   }
-
-  // غیرفعال کردن کاربر
   async deactivateUser(publicKey: string): Promise<string> {
-    try {
-      // دستور حذف کاربر از فایل wg0.conf
-      const command = `wg set wg0 peer ${publicKey} remove`;
-      await execPromise(command);
-      const updatedConfig = config.replace(
-        /### Client ${publicKey}[\s\S]*?AllowedIPs = 10\.66\.66\.3\/32/g, 
-        match => match.split('\n').map(line => `# ${line}`).join('\n')
-      );
+    const wg0ConfigPath = `/etc/openvpn/ccd/${publicKey}`;
+    return new Promise((resolve, reject) => {
+      const config = fs.promises.readFile(wg0ConfigPath, 'utf-8')
+        .then(config => {
+          console.log(publicKey);
+          console.log(config);
+          // const updatedConfig = config.replace(
+          //   new RegExp(`### Client ${publicKey}[\\s\\S]*?AllowedIPs = [\\d\\.]+/32`, 'g'),
+          //   match => match.split('\n').map(line => `# ${line}`).join('\n')
+          // );
 
-      // نوشتن مجدد فایل wg0.conf
-      await fs.promises.writeFile(wg0ConfigPath, updatedConfig, 'utf-8');
-      return 'User deactivated successfully';
-    } catch (error) {
-      throw new Error(`Error deactivating user: ${error.message}`);
-    }
+          // return fs.promises.writeFile(wg0ConfigPath, updatedConfig, 'utf-8');
+          return
+        })
+        .then(() => {
+          exec('sudo systemctl restart wg-quick@wg0', (error, stdout, stderr) => {
+            if (error) {
+              reject(`Error restarting WireGuard: ${error.message}`);
+            } else {
+              resolve('User deactivated successfully');
+            }
+          });
+        })
+        .catch(err => reject(`Error handling config file: ${err.message}`));
+    });
   }
 }
