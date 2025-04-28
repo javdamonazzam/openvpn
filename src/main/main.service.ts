@@ -9,10 +9,10 @@ export class MainService {
   
     try {
       await fs.promises.writeFile(wg0ConfigPath, '', 'utf-8');
-      return `User ${publicKey} has been deactivated.`;
+      return `User ${publicKey} activated.`;
     } catch (error) {
       console.error(error);
-      throw new Error(`Failed to deactivate user ${publicKey}: ${error}`);
+      throw new Error(`Failed to ctivate user ${publicKey}: ${error}`);
     }
   }
   async deactivateUser(publicKey: string): Promise<string> {
